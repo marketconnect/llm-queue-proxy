@@ -30,7 +30,16 @@ Ideal for multi-agent systems, microservices, or corporate environments where mu
 ```bash
 git clone https://github.com/yourname/llm-queue-proxy.git
 cd llm-queue-proxy
-go build -o /usr/local/bin/llm_queue_proxy main.go
+# Install 
+go build -o /usr/local/bin/llm_queue_proxy .cmd/main.go
+# Setup
+sudo cp llm-queue-proxy.env /etc/llm-queue-proxy.env
+# Enable and start
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable --now llm-queue-proxy.service
+# Check status
+sudo systemctl status llm-queue-proxy.service
 ```
 
 ## 🛠 Setup (as systemd service)
