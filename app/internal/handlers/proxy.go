@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"io"
 	"log"
 	"net/http"
@@ -21,8 +20,24 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Request body: %s", string(body))
 
-	// Восстанавливаем тело для повторного использования
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
+	req := queue.ProxyRequest{
+		Method:  r.Method,
+		Path:    r.URL.Path,
+		Headers: r.Header.Clone(),
+		Body:    body,
+	}
 
-	queue.Push(queue.ProxyRequest{W: w, R: r, Body: body})
+	resp := queue.Push(req)
+	if resp.Err != nil {
+		http.Error(w, "Proxy error: "+resp.Err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	for k, v := range resp.Headers {
+		for _, val := range v {
+			w.Header().Add(k, val)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	w.Write(resp.Body)
 }

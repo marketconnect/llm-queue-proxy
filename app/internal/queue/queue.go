@@ -5,16 +5,24 @@ import (
 	"context"
 	"io"
 	"net/http"
-
 	"time"
 
 	"github.com/marketconnect/llm-queue-proxy/app/internal/config"
 )
 
 type ProxyRequest struct {
-	W    http.ResponseWriter
-	R    *http.Request
-	Body []byte
+	Method  string
+	Path    string
+	Headers http.Header
+	Body    []byte
+	Reply   chan ProxyResponse
+}
+
+type ProxyResponse struct {
+	StatusCode int
+	Headers    http.Header
+	Body       []byte
+	Err        error
 }
 
 var ch chan ProxyRequest
@@ -33,30 +41,37 @@ func Init(limitPerMin int) {
 	}()
 }
 
-func Push(r ProxyRequest) {
+func Push(r ProxyRequest) ProxyResponse {
+	r.Reply = make(chan ProxyResponse, 1)
 	ch <- r
+	return <-r.Reply
 }
 
 func handle(p ProxyRequest) {
 	ctx := context.Background()
-	targetURL := cfg.OpenAI.BASE_URL + p.R.URL.Path
+	targetURL := cfg.OpenAI.BASE_URL + p.Path
 
-	req, err := http.NewRequestWithContext(ctx, p.R.Method, targetURL, bytes.NewReader(p.Body))
+	req, err := http.NewRequestWithContext(ctx, p.Method, targetURL, bytes.NewReader(p.Body))
 	if err != nil {
-		http.Error(p.W, "failed to create request", http.StatusInternalServerError)
+		p.Reply <- ProxyResponse{Err: err}
 		return
 	}
 
-	req.Header = p.R.Header.Clone()
+	req.Header = p.Headers.Clone()
 	req.Header.Set("Authorization", "Bearer "+cfg.OpenAI.APIKey)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		http.Error(p.W, "proxy request failed", http.StatusBadGateway)
+		p.Reply <- ProxyResponse{Err: err}
 		return
 	}
 	defer resp.Body.Close()
 
-	p.W.WriteHeader(resp.StatusCode)
-	io.Copy(p.W, resp.Body)
+	respBody, _ := io.ReadAll(resp.Body)
+
+	p.Reply <- ProxyResponse{
+		StatusCode: resp.StatusCode,
+		Headers:    resp.Header.Clone(),
+		Body:       respBody,
+	}
 }
