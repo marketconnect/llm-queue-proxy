@@ -5,11 +5,12 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/llm-queue-proxy
-WorkingDirectory=/opt/llm-queue-proxy
 EnvironmentFile=/etc/llm-queue-proxy.env
 Restart=on-failure
 RestartSec=3
 LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
