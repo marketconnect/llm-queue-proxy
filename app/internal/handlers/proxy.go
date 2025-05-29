@@ -10,6 +10,7 @@ import (
 
 func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Handling request for: %s", r.URL.String())
+	log.Printf("Request headers: %s", r.Header)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
