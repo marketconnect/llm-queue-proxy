@@ -19,6 +19,7 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this is a session-based request
 	sessionID := extractSessionID(r.URL.Path)
+	log.Printf("Path: %s", r.URL.Path)
 	var sessionManager *session.SessionManager
 	var sessionData *session.SessionData
 
