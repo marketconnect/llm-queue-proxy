@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/marketconnect/llm-queue-proxy/app/internal/queue"
 	"github.com/marketconnect/llm-queue-proxy/app/internal/session"
@@ -74,12 +77,35 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log the response body before parsing (for debugging)
-	log.Printf("Response body from upstream: %s", string(resp.Body))
-
-	// Parse token usage from response if this is a session-based request
+	// Decompress response body if it's gzipped for token parsing
+	var responseBodyForParsing []byte
 	if sessionID != "" && sessionManager != nil {
-		if tokenUsage, err := session.ParseTokenUsageFromResponse(resp.Body); err == nil && tokenUsage != nil {
+		// Check if response is gzipped
+		contentEncoding := resp.Headers.Get("Content-Encoding")
+		if strings.Contains(strings.ToLower(contentEncoding), "gzip") {
+			// Decompress for token parsing
+			reader, err := gzip.NewReader(bytes.NewReader(resp.Body))
+			if err != nil {
+				log.Printf("Error creating gzip reader: %v", err)
+				responseBodyForParsing = resp.Body
+			} else {
+				decompressed, err := io.ReadAll(reader)
+				reader.Close()
+				if err != nil {
+					log.Printf("Error decompressing response: %v", err)
+					responseBodyForParsing = resp.Body
+				} else {
+					responseBodyForParsing = decompressed
+					log.Printf("Decompressed response body: %s", string(responseBodyForParsing))
+				}
+			}
+		} else {
+			responseBodyForParsing = resp.Body
+			log.Printf("Response body from upstream: %s", string(responseBodyForParsing))
+		}
+
+		// Parse token usage from decompressed response
+		if tokenUsage, err := session.ParseTokenUsageFromResponse(responseBodyForParsing); err == nil && tokenUsage != nil {
 			updatedSession := sessionManager.UpdateSessionTokens(sessionID, *tokenUsage)
 			log.Printf("Updated session %s token usage - Prompt: %d, Completion: %d, Total: %d, Requests: %d",
 				sessionID, updatedSession.TotalPromptTokens, updatedSession.TotalCompletionTokens,
