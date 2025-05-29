@@ -138,17 +138,27 @@ func extractSessionID(path string) string {
 // removeSessionFromPath removes the session part from the path for upstream request
 // e.g., /v1/session/abc123/chat/completions -> /v1/chat/completions
 func removeSessionFromPath(path string) string {
+	log.Printf("Removing session from path: %s", path)
+
 	// Pattern: /v1/session/{sessionID}/... -> /v1/...
 	re := regexp.MustCompile(`^/v1/session/[^/]+(/.*)?$`)
 	matches := re.FindStringSubmatch(path)
-	if len(matches) < 2 {
+
+	log.Printf("Regex matches: %v", matches)
+
+	if len(matches) < 1 {
 		// If no match, return original path (fallback)
+		log.Printf("No regex match, returning original path: %s", path)
 		return path
 	}
 
 	// If there's a remaining path after session ID, use it; otherwise use /v1/
-	if matches[1] != "" {
-		return "/v1" + matches[1]
+	if len(matches) > 1 && matches[1] != "" {
+		result := "/v1" + matches[1]
+		log.Printf("Transformed path: %s -> %s", path, result)
+		return result
+	} else {
+		log.Printf("No path after session ID, returning /v1/")
+		return "/v1/"
 	}
-	return "/v1/"
 }
