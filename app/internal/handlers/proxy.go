@@ -10,31 +10,26 @@ import (
 	"github.com/marketconnect/llm-queue-proxy/app/internal/session"
 )
 
-// ProxyHandler handles both regular and session-based requests
+// ProxyHandler handles session-based requests
 func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Handling request for: %s", r.URL.String())
 
-	// Check if this is a session-based request
+	// Extract session ID from the URL
 	sessionID := extractSessionID(r.URL.Path)
-	var sessionManager *session.SessionManager
-	var sessionData *session.SessionData
-
-	if sessionID != "" {
-		log.Printf("Extracted session ID: %s", sessionID)
-
-		// Get or create session
-		sessionManager = session.GetManager()
-		sessionData = sessionManager.GetSession(sessionID)
-		if sessionData == nil {
-			_ = sessionManager.CreateSession(sessionID)
-			log.Printf("Created new session: %s", sessionID)
-		}
+	if sessionID == "" {
+		http.Error(w, "Session ID not found", http.StatusNotFound)
+		return
 	}
 
-	for k, v := range r.Header {
-		log.Printf("Header: %s: %s", k, v)
+	// Get or create session
+	sessionManager := session.GetManager()
+	sessionData := sessionManager.GetSession(sessionID)
+	if sessionData == nil {
+		_ = sessionManager.CreateSession(sessionID)
+		log.Printf("Created new session: %s", sessionID)
 	}
 
+	// Read the request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
@@ -44,28 +39,23 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Request body: %s", string(body))
 
-	// Determine the upstream path
-	var upstreamPath string
-	if sessionID != "" {
-		// Remove session ID from path for upstream request
-		upstreamPath = removeSessionFromPath(r.URL.Path)
-	} else {
-		// Use original path for regular requests
-		upstreamPath = r.URL.Path
-	}
-
+	// Prepare the upstream request
 	req := queue.ProxyRequest{
 		Method:  r.Method,
-		Path:    upstreamPath,
+		Path:    removeSessionFromPath(r.URL.Path),
 		Headers: r.Header.Clone(),
 		Body:    body,
 	}
 
+	// Send the request to the upstream API
 	resp := queue.Push(req)
 	if resp.Err != nil {
 		http.Error(w, "Proxy error: "+resp.Err.Error(), http.StatusBadGateway)
 		return
 	}
+
+	// Log the response body before parsing
+	log.Printf("Response body from upstream: %s", string(resp.Body))
 
 	// Parse token usage from response if this is a session-based request
 	if sessionID != "" && sessionManager != nil {
@@ -79,6 +69,7 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Write the response back to the client
 	for k, v := range resp.Headers {
 		for _, val := range v {
 			w.Header().Add(k, val)
