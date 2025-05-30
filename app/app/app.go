@@ -10,8 +10,6 @@ import (
 	"github.com/marketconnect/llm-queue-proxy/app/internal/queue"
 	"github.com/marketconnect/llm-queue-proxy/app/internal/repository"
 	"github.com/marketconnect/llm-queue-proxy/app/internal/session"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // App holds all application dependencies
@@ -35,8 +33,6 @@ func NewApp() (*App, error) {
 
 	switch cfg.Repository.Type {
 	case "sqlite":
-		// Note: The application using this module must import the SQLite driver, e.g.,
-		// import _ "github.com/mattn/go-sqlite3"
 		repo, err = repository.NewSQLiteRepository(cfg.Repository.SQLiteDSN)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize SQLite repository: %w", err)

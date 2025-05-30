@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/mattn/go-sqlite3" // SQLite driver
+
 	"github.com/marketconnect/llm-queue-proxy/app/app"
 )
 
