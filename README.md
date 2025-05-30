@@ -40,6 +40,10 @@ go build -o llm-queue-proxy ./app/cmd/main.go
 
 # For system-wide installation
 sudo cp llm-queue-proxy /usr/local/bin/
+
+# sqlite path
+sudo mkdir -p /var/lib/llm-queue-proxy
+sudo chmod 755 /var/lib/llm-queue-proxy
 ```
 
 ---
