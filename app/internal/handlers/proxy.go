@@ -3,25 +3,49 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"github.com/marketconnect/llm-queue-proxy/app/internal/queue"
-	"github.com/marketconnect/llm-queue-proxy/app/internal/session"
+	"github.com/marketconnect/llm-queue-proxy/app/domain/entities"
 )
 
+type Queue interface {
+	Push(r entities.ProxyRequest) entities.ProxyResponse
+}
+
+type ProxySessionManager interface {
+	GetSession(sessionID string) (*entities.SessionData, error)
+	CreateSession(sessionID string) (*entities.SessionData, error)
+	ListSessions() (map[string]*entities.SessionData, error)
+	UpdateSessionTokens(sessionID string, usage entities.TokenUsage) (*entities.SessionData, error)
+	ParseTokenUsageFromResponse(responseBody []byte) (*entities.TokenUsage, error)
+}
+
 // ProxyHandler handles both regular and session-based requests
-func ProxyHandler(w http.ResponseWriter, r *http.Request) {
+type ProxyHandler struct {
+	sessionManager ProxySessionManager
+	queue          Queue
+}
+
+// NewProxyHandler creates a new ProxyHandler with injected dependencies
+func NewProxyHandler(sessionManager ProxySessionManager, queue Queue) *ProxyHandler {
+	return &ProxyHandler{
+		sessionManager: sessionManager,
+		queue:          queue,
+	}
+}
+
+// Handle processes the HTTP request
+func (ph *ProxyHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Handling request for: %s", r.URL.String())
 
 	// Check if this is a session-based request
 	sessionID := extractSessionID(r.URL.Path)
 	log.Printf("Path: %s", r.URL.Path)
-	var sessionManager *session.SessionManager
-	var sessionData *session.SessionData
 
 	if sessionID != "" {
 		log.Printf("Extracted session ID: %s", sessionID)
@@ -34,11 +58,21 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get or create session
-		sessionManager = session.GetManager()
-		sessionData = sessionManager.GetSession(sessionID)
-		if sessionData == nil {
-			_ = sessionManager.CreateSession(sessionID)
-			log.Printf("Created new session: %s", sessionID)
+		_, errSess := ph.sessionManager.GetSession(sessionID)
+		if errSess != nil {
+			if errors.Is(errSess, entities.ErrSessionNotFound) {
+				_, errSess = ph.sessionManager.CreateSession(sessionID)
+				if errSess != nil {
+					log.Printf("Error creating session %s: %v", sessionID, errSess)
+					http.Error(w, "Failed to initialize session", http.StatusInternalServerError)
+					return
+				}
+				log.Printf("Created new session: %s", sessionID)
+			} else {
+				log.Printf("Error retrieving session %s: %v", sessionID, errSess)
+				http.Error(w, "Failed to retrieve session", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
@@ -65,14 +99,15 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 		upstreamPath = r.URL.Path
 	}
 
-	req := queue.ProxyRequest{
+	req := entities.ProxyRequest{
+		Reply:   make(chan entities.ProxyResponse, 1),
 		Method:  r.Method,
 		Path:    upstreamPath,
 		Headers: r.Header.Clone(),
 		Body:    body,
 	}
 
-	resp := queue.Push(req)
+	resp := ph.queue.Push(req)
 	if resp.Err != nil {
 		http.Error(w, "Proxy error: "+resp.Err.Error(), http.StatusBadGateway)
 		return
@@ -80,7 +115,7 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Decompress response body if it's gzipped for token parsing
 	var responseBodyForParsing []byte
-	if sessionID != "" && sessionManager != nil {
+	if sessionID != "" && ph.sessionManager != nil {
 		// Check if response is gzipped
 		contentEncoding := resp.Headers.Get("Content-Encoding")
 		if strings.Contains(strings.ToLower(contentEncoding), "gzip") {
@@ -106,13 +141,18 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Parse token usage from decompressed response
-		if tokenUsage, err := session.ParseTokenUsageFromResponse(responseBodyForParsing); err == nil && tokenUsage != nil {
-			updatedSession := sessionManager.UpdateSessionTokens(sessionID, *tokenUsage)
-			log.Printf("Updated session %s token usage - Prompt: %d, Completion: %d, Total: %d, Requests: %d",
-				sessionID, updatedSession.TotalPromptTokens, updatedSession.TotalCompletionTokens,
-				updatedSession.TotalTokens, updatedSession.RequestCount)
+		if tokenUsage, err := ph.sessionManager.ParseTokenUsageFromResponse(responseBodyForParsing); err == nil && tokenUsage != nil {
+			updatedSession, errUpdate := ph.sessionManager.UpdateSessionTokens(sessionID, *tokenUsage)
+			if errUpdate != nil {
+				log.Printf("Error updating session tokens for %s: %v", sessionID, errUpdate)
+				// Potentially return an error to client, or just log and continue
+			} else {
+				log.Printf("Updated session %s token usage - Prompt: %d, Completion: %d, Total: %d, Requests: %d",
+					sessionID, updatedSession.TotalPromptTokens, updatedSession.TotalCompletionTokens,
+					updatedSession.TotalTokens, updatedSession.RequestCount)
+			}
 		} else if err != nil {
-			log.Printf("Error parsing token usage: %v", err)
+			log.Printf("Error parsing token usage for session %s: %v", sessionID, err)
 		}
 	}
 
@@ -123,6 +163,13 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(resp.StatusCode)
 	w.Write(resp.Body)
+}
+
+// Legacy function for backward compatibility - renamed to avoid conflict
+func LegacyProxyHandler(w http.ResponseWriter, r *http.Request) {
+	// This would need a global session manager, but we're moving away from this pattern
+	// For now, return an error indicating the new pattern should be used
+	http.Error(w, "ProxyHandler requires dependency injection. Use NewProxyHandler instead.", http.StatusInternalServerError)
 }
 
 // extractSessionID extracts session ID from URL path like /v1/session/{sessionID}/chat/completions

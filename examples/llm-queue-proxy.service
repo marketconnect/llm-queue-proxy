@@ -1,16 +1,27 @@
 [Unit]
-Description=LLM Queue Proxy Service
+Description=LLM Queue Proxy with Session Tracking
 After=network.target
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/llm-queue-proxy
-EnvironmentFile=/etc/llm-queue-proxy.env
+EnvironmentFile=/etc/llm-queue-proxy/proxy.env
+WorkingDirectory=/var/lib/llm-queue-proxy
+User=llm-proxy
+Group=llm-proxy
 Restart=on-failure
-RestartSec=3
+RestartSec=5
 LimitNOFILE=65536
 StandardOutput=journal
 StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/llm-queue-proxy
+ReadOnlyPaths=/etc/llm-queue-proxy
 
 [Install]
 WantedBy=multi-user.target

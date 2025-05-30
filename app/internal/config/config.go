@@ -19,6 +19,10 @@ type Config struct {
 	HTTP struct {
 		Port int `env:"PORT" env-default:"8080"`
 	}
+	Repository struct {
+		Type      string `env:"REPOSITORY_TYPE" env-default:"memory"`
+		SQLiteDSN string `env:"SQLITE_DSN" env-default:"sessions.db"`
+	}
 }
 
 // Singleton: Config should only ever be created once.

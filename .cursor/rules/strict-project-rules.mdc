@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Strict Golang Coding Rules for This Project Structure
+
+1. **Dependency Injection**:  
+   - All application dependencies (repositories, managers, queues, etc.) MUST be instantiated and injected ONLY in `app/app.go`.  
+   - No package, except for the application bootstrap (`app/app.go`), may directly construct or initialize dependencies outside this central location.
+
+2. **Domain Layer Isolation**:  
+   - Only the `domain/entities` package may contain domain types (entities, structs, error definitions).  
+   - No other package may define business/domain entities, except those placed within `domain/entities/`.
+   - All data objects (e.g., `SessionData`, `TokenUsage`, `ProxyRequest`, `ProxyResponse`, errors) MUST be defined exclusively in `domain/entities/`.
+
+3. **Interface-Based Dependency Management**:  
+   - All external or internal dependencies between packages (e.g., session storage, queues, handlers) MUST be expressed via interfaces.
+   - Concrete implementations (e.g., memory/SQLite repositories, managers, queues) MUST satisfy interfaces and be injected via constructors.
+
+4. **No Circular Dependencies**:  
+   - The `domain` package MUST NOT import from or depend on any internal, application, or infrastructure code.
+   - Internal packages (`internal/...`) may depend on domain entities and interfaces, but NEVER the reverse.
+
+5. **Handler Construction**:  
+   - HTTP handlers MUST be constructed via exported constructors (`NewHandlerType(...)`) that accept interfaces for all dependencies.
+   - Handlers MUST NOT access global state or singletons; use only injected dependencies.
+
+6. **Extensibility and Isolation**:  
+   - To add new storage or integration types, implement the relevant interface in a new file under `internal/repository/` and register it for construction via configuration in `app.go`.
