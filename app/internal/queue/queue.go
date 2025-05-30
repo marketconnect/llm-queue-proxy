@@ -3,6 +3,7 @@ package queue
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -24,6 +25,11 @@ func NewQueue(limitPerMin int, baseURL string, openAIAPIKey string) *Queue {
 		ch:           make(chan entities.ProxyRequest, 1000),
 		baseURL:      baseURL,
 		openAIAPIKey: openAIAPIKey,
+	}
+
+	if limitPerMin <= 0 {
+		log.Printf("Warning: RateLimitPerMin is %d, which is invalid. Defaulting to 60.", limitPerMin)
+		limitPerMin = 60 // Default to a sensible value
 	}
 
 	interval := time.Minute / time.Duration(limitPerMin)
@@ -79,7 +85,17 @@ func (q *Queue) handle(p entities.ProxyRequest) {
 	log.Printf("Received response with status: %d", resp.StatusCode)
 	log.Printf("Response headers: %v", resp.Header)
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, errRead := io.ReadAll(resp.Body)
+	if errRead != nil {
+		log.Printf("Error reading response body: %v", errRead)
+		p.Reply <- entities.ProxyResponse{
+			StatusCode: http.StatusBadGateway, // Or resp.StatusCode if headers are still relevant
+			Headers:    resp.Header.Clone(),
+			Body:       nil,
+			Err:        fmt.Errorf("failed to read upstream response body: %w", errRead),
+		}
+		return
+	}
 
 	p.Reply <- entities.ProxyResponse{
 		StatusCode: resp.StatusCode,

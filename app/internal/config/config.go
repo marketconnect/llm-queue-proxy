@@ -8,12 +8,12 @@ import (
 )
 
 type Config struct {
-	IsDebug       bool `env:"IS_DEBUG" env-default:"false"`
-	IsDevelopment bool `env:"IS_DEV" env-default:"false"`
+	IsDev   bool `env:"IS_DEV" env-default:"false"`
+	IsDebug bool `env:"IS_DEBUG" env-default:"false"`
 
 	OpenAI struct {
 		APIKey          string `env:"OPENAI_API_KEY" env-required:"true"`
-		BASE_URL        string `env:"OPENAI_BASE_URL" env-default:"https://api.openai.com/v1"`
+		BaseURL         string `env:"OPENAI_BASE_URL" env-default:"https://api.openai.com/v1"`
 		RateLimitPerMin int    `env:"RATE_LIMIT_PER_MIN" env-default:"60"`
 	}
 	HTTP struct {

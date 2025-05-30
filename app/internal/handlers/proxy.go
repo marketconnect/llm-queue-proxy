@@ -76,10 +76,6 @@ func (ph *ProxyHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for k, v := range r.Header {
-		log.Printf("Header: %s: %s", k, v)
-	}
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
@@ -194,7 +190,7 @@ func removeSessionFromPath(path string) string {
 
 	log.Printf("Regex matches: %v", matches)
 
-	if len(matches) < 1 {
+	if matches == nil {
 		// If no match, return original path (fallback)
 		log.Printf("No regex match, returning original path: %s", path)
 		return path

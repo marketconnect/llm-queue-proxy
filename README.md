@@ -35,15 +35,15 @@ Ideal for multi-agent systems, microservices, or corporate environments where mu
 git clone https://github.com/yourname/llm-queue-proxy.git
 cd llm-queue-proxy
 
+# SQLite path (optional)
+sudo mkdir -p /var/lib/llm-queue-proxy
+sudo chmod 755 /var/lib/llm-queue-proxy
+
 # Build the application
 go build -o llm-queue-proxy ./app/cmd/main.go
 
 # For system-wide installation
 sudo cp llm-queue-proxy /usr/local/bin/
-
-# sqlite path
-sudo mkdir -p /var/lib/llm-queue-proxy
-sudo chmod 755 /var/lib/llm-queue-proxy
 ```
 
 ---

@@ -52,7 +52,7 @@ func NewApp() (*App, error) {
 	sessionManager := session.NewSessionManager(repo)
 
 	// Create queue with config dependency
-	queueInstance := queue.NewQueue(cfg.OpenAI.RateLimitPerMin, cfg.OpenAI.BASE_URL, cfg.OpenAI.APIKey)
+	queueInstance := queue.NewQueue(cfg.OpenAI.RateLimitPerMin, cfg.OpenAI.BaseURL, cfg.OpenAI.APIKey)
 
 	return &App{
 		Config:         cfg,
@@ -75,27 +75,18 @@ func (a *App) Close() error {
 	return nil
 }
 
-func (a App) Run() error {
-	// Create all dependencies
-	deps, err := NewApp()
-	if err != nil {
-		return fmt.Errorf("failed to create dependencies: %w", err)
-	}
-	defer func() {
-		if err := deps.Close(); err != nil {
-			log.Printf("Error closing dependencies: %v", err)
-		}
-	}()
-
+// Run starts the HTTP server and registers handlers.
+// The App instance `a` should be fully initialized before calling Run.
+func (a *App) Run() error {
 	// Create handler with injected dependencies
-	proxyHandler := handlers.NewProxyHandler(deps.SessionManager, deps.Queue)
-	sessionStatusHandler := handlers.NewSessionStatusHandler(deps.SessionManager)
+	proxyHandler := handlers.NewProxyHandler(a.SessionManager, a.Queue)
+	sessionStatusHandler := handlers.NewSessionStatusHandler(a.SessionManager)
 
 	// Setup routes
 	http.HandleFunc("/v1/session/", proxyHandler.Handle)
 	http.HandleFunc("/sessions/status", sessionStatusHandler.HandleList)
 
-	addr := fmt.Sprintf(":%d", deps.Config.HTTP.Port)
+	addr := fmt.Sprintf(":%d", a.Config.HTTP.Port)
 	log.Printf("Starting server on %s", addr)
 	log.Printf("Available endpoints:")
 	log.Printf("  - Proxy (session): /v1/session/{sessionID}/...")
