@@ -10,6 +10,8 @@ import (
 	"github.com/marketconnect/llm-queue-proxy/app/internal/queue"
 	"github.com/marketconnect/llm-queue-proxy/app/internal/repository"
 	"github.com/marketconnect/llm-queue-proxy/app/internal/session"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // App holds all application dependencies
