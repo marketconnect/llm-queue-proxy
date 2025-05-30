@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/marketconnect/llm-queue-proxy/app/domain/entities"
@@ -17,6 +18,8 @@ type Queue struct {
 	ch           chan entities.ProxyRequest
 	baseURL      string
 	openAIAPIKey string
+	closed       bool
+	mu           sync.Mutex
 }
 
 // NewQueue creates a new queue with injected config
@@ -25,6 +28,7 @@ func NewQueue(limitPerMin int, baseURL string, openAIAPIKey string) *Queue {
 		ch:           make(chan entities.ProxyRequest, 1000),
 		baseURL:      baseURL,
 		openAIAPIKey: openAIAPIKey,
+		closed:       false,
 	}
 
 	if limitPerMin <= 0 {
@@ -52,7 +56,12 @@ func (q *Queue) Push(r entities.ProxyRequest) entities.ProxyResponse {
 
 // Close gracefully shuts down the queue
 func (q *Queue) Close() {
-	close(q.ch)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if !q.closed {
+		close(q.ch)
+		q.closed = true
+	}
 }
 
 func (q *Queue) handle(p entities.ProxyRequest) {
@@ -70,6 +79,10 @@ func (q *Queue) handle(p entities.ProxyRequest) {
 		return
 	}
 
+	// Initialize headers if nil
+	if p.Headers == nil {
+		p.Headers = make(http.Header)
+	}
 	req.Header = p.Headers.Clone()
 	req.Header.Set("Authorization", "Bearer "+q.openAIAPIKey)
 
