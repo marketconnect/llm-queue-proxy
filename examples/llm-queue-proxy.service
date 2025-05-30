@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 ExecStart=/usr/local/bin/llm-queue-proxy
 EnvironmentFile=/etc/llm-queue-proxy.env
+WorkingDirectory=/var/lib/llm-queue-proxy
 Restart=on-failure
 RestartSec=3
 LimitNOFILE=65536
