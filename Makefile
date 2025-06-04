@@ -17,12 +17,19 @@ test:
 	@$(TEST_CMD)
 
 # Target to run tests and then Git commands if tests are OK
-test-and-commit: test
-	@echo "Tests passed. Proceeding with Git commands..."
-	@git add .
-	@git commit -m "$(COMMIT_MESSAGE)"
-	@echo "Changes added and committed with message: $(COMMIT_MESSAGE)"
-	@echo "Consider running 'git push' manually if needed."
+test-and-commit:
+	@echo "Running tests in $(GO_MODULE_DIR)..."
+	@$(TEST_CMD)
+	@if [ $$? -eq 0 ]; then \
+	  echo "Tests passed. Proceeding with Git commands..."; \
+	  git add .; \
+	  git commit -m "$(COMMIT_MESSAGE)"; \
+	  echo "Changes added and committed with message: $(COMMIT_MESSAGE)"; \
+	  echo "Consider running 'git push' manually if needed."; \
+	else \
+	  echo "Tests failed. Commit aborted."; \
+	  exit 1; \
+	fi
 
 # A simple help target
 help:

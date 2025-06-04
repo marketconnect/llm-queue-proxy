@@ -42,6 +42,11 @@ func NewProxyHandler(sessionManager ProxySessionManager, queue Queue) *ProxyHand
 // Handle processes the HTTP request
 func (ph *ProxyHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Handling request for: %s", r.URL.String())
+	for k, v := range r.Header {
+		for _, val := range v {
+			log.Printf("Header: %s: %s", k, val)
+		}
+	}
 
 	// Check if this is a session-based request
 	sessionID := extractSessionID(r.URL.Path)
