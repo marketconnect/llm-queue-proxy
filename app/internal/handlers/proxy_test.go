@@ -291,6 +291,7 @@ func Test_extractSessionID(t *testing.T) {
 	}{
 		{"valid session path", "/v1/session/abc123/chat/completions", "abc123"},
 		{"valid session path with trailing slash", "/v1/session/xyz789/", "xyz789"},
+		{"session underscore format", "/v1/session_abc123/chat/completions", "abc123"},
 		{"no session ID", "/v1/chat/completions", ""},
 		{"invalid path", "/foo/bar", ""},
 		{"empty path", "", ""},
@@ -315,8 +316,10 @@ func Test_removeSessionFromPath(t *testing.T) {
 		{"path with session and endpoint", "/v1/session/abc123/chat/completions", "/v1/chat/completions"},
 		{"path with session and trailing slash", "/v1/session/xyz789/", "/v1/"},
 		{"path with session and no further endpoint", "/v1/session/onlysess", "/v1/"},
+		{"underscore session format", "/v1/session_abc123/chat/completions", "/v1/chat/completions"},
+		{"underscore session trailing slash", "/v1/session_abc123/", "/v1/"},
 		{"path without session", "/v1/chat/completions", "/v1/chat/completions"}, // No change if no session pattern
-		{"malformed path", "/v1/session/", "/v1/session/"},                       // No change if malformed
+		{"malformed path", "/v1/session/", "/v1/session/"},
 		{"root path", "/", "/"},
 		{"empty path", "", ""},
 	}

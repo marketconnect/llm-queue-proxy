@@ -173,10 +173,14 @@ func LegacyProxyHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "ProxyHandler requires dependency injection. Use NewProxyHandler instead.", http.StatusInternalServerError)
 }
 
-// extractSessionID extracts session ID from URL path like /v1/session/{sessionID}/chat/completions
+// extractSessionID extracts session ID from URL path.
+// It supports both formats:
+//
+//	/v1/session/{sessionID}/chat/completions
+//	/v1/session_{sessionID}/chat/completions
 func extractSessionID(path string) string {
-	// Pattern: /v1/session/{sessionID}/...
-	re := regexp.MustCompile(`^/v1/session/([^/]+)`)
+	// Pattern: either /v1/session/ID/... or /v1/session_ID/...
+	re := regexp.MustCompile(`^/v1/session(?:/|_)([^/]+)`)
 	matches := re.FindStringSubmatch(path)
 	if len(matches) < 2 {
 		return ""
@@ -184,13 +188,17 @@ func extractSessionID(path string) string {
 	return matches[1]
 }
 
-// removeSessionFromPath removes the session part from the path for upstream request
-// e.g., /v1/session/abc123/chat/completions -> /v1/chat/completions
+// removeSessionFromPath removes the session part from the path for upstream request.
+// Supports both /v1/session/{sessionID}/chat/completions and
+// /v1/session_{sessionID}/chat/completions.
+// Example: /v1/session/abc123/chat/completions -> /v1/chat/completions
+//
+//	/v1/session_abc123/chat/completions -> /v1/chat/completions
 func removeSessionFromPath(path string) string {
 	log.Printf("Removing session from path: %s", path)
 
-	// Pattern: /v1/session/{sessionID}/... -> /v1/...
-	re := regexp.MustCompile(`^/v1/session/[^/]+(/.*)?$`)
+	// Pattern: /v1/session/{ID}/... or /v1/session_{ID}/... -> /v1/...
+	re := regexp.MustCompile(`^/v1/session(?:/|_)[^/]+(/.*)?$`)
 	matches := re.FindStringSubmatch(path)
 
 	log.Printf("Regex matches: %v", matches)
