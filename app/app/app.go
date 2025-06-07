@@ -84,7 +84,7 @@ func (a *App) Run() error {
 
 	// Setup routes
 	http.HandleFunc("/v1/session/", proxyHandler.Handle)
-	http.HandleFunc("/sessions/status", sessionStatusHandler.HandleList)
+	http.HandleFunc("/sessions/status", sessionStatusHandler.HandleSingle)
 
 	addr := fmt.Sprintf(":%d", a.Config.HTTP.Port)
 	log.Printf("Starting server on %s", addr)
