@@ -221,6 +221,31 @@ func TestProxyHandler_Handle(t *testing.T) {
 			expectGetSessionCalled:   true,
 			expectUpdateTokensCalled: true,
 		},
+		{
+			name: "non-2xx response skips token parsing",
+			path: "/v1/session/error404/chat/completions",
+			mockSessionManagerSetup: func(msm *mockProxySessionManager) {
+				msm.GetSessionFunc = func(sessionID string) (*entities.SessionData, error) {
+					return &entities.SessionData{SessionID: sessionID}, nil
+				}
+				msm.ParseTokenUsageFromResponseFunc = func(responseBody []byte) (*entities.TokenUsage, error) {
+					t.Errorf("ParseTokenUsageFromResponse should not be called")
+					return nil, nil
+				}
+				msm.UpdateSessionTokensFunc = func(sessionID string, usage entities.TokenUsage) (*entities.SessionData, error) {
+					t.Errorf("UpdateSessionTokens should not be called")
+					return nil, nil
+				}
+			},
+			mockQueueSetup: func(mq *mockQueue) {
+				mq.PushFunc = func(r entities.ProxyRequest) entities.ProxyResponse {
+					body := []byte("<html><body>404 Not Found</body></html>")
+					return entities.ProxyResponse{StatusCode: http.StatusNotFound, Body: body}
+				}
+			},
+			expectedStatusCode:   http.StatusNotFound,
+			expectedBodyContains: "404 Not Found",
+		},
 	}
 
 	for _, tt := range tests {
