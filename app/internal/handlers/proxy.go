@@ -116,7 +116,7 @@ func (ph *ProxyHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	// Decompress response body if it's gzipped for token parsing
 	var responseBodyForParsing []byte
-	if sessionID != "" && ph.sessionManager != nil {
+	if sessionID != "" && ph.sessionManager != nil && resp.StatusCode >= http.StatusOK && resp.StatusCode < 300 {
 		// Check if response is gzipped
 		contentEncoding := resp.Headers.Get("Content-Encoding")
 		if strings.Contains(strings.ToLower(contentEncoding), "gzip") {
